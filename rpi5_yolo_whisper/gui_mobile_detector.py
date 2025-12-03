@@ -378,10 +378,24 @@ class MobileGUIDetector:
         self.time_label = ttk.Label(stats_grid, text="00:00", style='Status.TLabel')
         self.time_label.grid(row=4, column=1, sticky=tk.W)
         
+        # ===== VOICE STATUS PANEL (NEW) =====
+        voice_status_frame = ttk.LabelFrame(main_frame, text="🎤 Voice Status", 
+                                           padding="10", style='Medium.TFrame')
+        voice_status_frame.pack(fill=tk.X, pady=5)
+        
+        self.voice_status_label = ttk.Label(
+            voice_status_frame,
+            text="Voice control is OFF",
+            style='Info.TLabel',
+            font=('Arial', 12, 'bold'),
+            foreground='#8a8a8a'
+        )
+        self.voice_status_label.pack(fill=tk.X, pady=5)
+        
         # ===== STATUS BAR =====
         self.status_label = ttk.Label(
             main_frame,
-            text="📍 Ready • Say 'IRIS DETECT' to start detection",
+            text="📍 Ready • Enable voice control or use manual start",
             style='Info.TLabel',
             relief=tk.SUNKEN,
             anchor=tk.W,
@@ -456,8 +470,12 @@ class MobileGUIDetector:
                 text="🎤 Voice Control: ON",
                 bg='#107c10'
             )
+            self.voice_status_label.config(
+                text="🎤 Listening for 'IRIS' wake word...",
+                foreground='#00ff00'
+            )
             self.status_label.config(
-                text="🎤 Listening • Say 'IRIS' then 'DETECT' or 'STOP'"
+                text="🎤 Voice control active • Say 'IRIS' then 'DETECT' or 'STOP'"
             )
             
             # Start voice thread
@@ -474,6 +492,10 @@ class MobileGUIDetector:
                 text="🎤 Voice Control: OFF",
                 bg='#d13438'
             )
+            self.voice_status_label.config(
+                text=f"❌ Error: {e}",
+                foreground='#ff0000'
+            )
             self.status_label.config(text=f"❌ Voice control error: {e}")
     
     def stop_voice_control(self):
@@ -483,26 +505,43 @@ class MobileGUIDetector:
             text="🎤 Voice Control: OFF",
             bg='#d13438'
         )
+        self.voice_status_label.config(
+            text="Voice control is OFF",
+            foreground='#8a8a8a'
+        )
         self.status_label.config(text="📍 Voice control stopped")
         logger.info("Voice control stopped")
+    
+    def _update_voice_status(self, text, color='#00ff00'):
+        """Update voice status display"""
+        self.voice_status_label.config(text=text, foreground=color)
     
     def _voice_loop(self):
         """Voice command loop"""
         while self.voice_listening:
             try:
+                # Update status - listening for wake word
+                self.root.after(0, self._update_voice_status, "🎤 Listening for 'IRIS'...", '#00ff00')
+                logger.info("Listening for wake word 'IRIS'...")
+                
                 # Listen for wake word
-                logger.info("Listening for wake word...")
                 detected = self.wake_detector.listen_for_wake_word()
                 
                 if not detected or not self.voice_listening:
                     continue
                 
-                logger.info("Wake word detected!")
+                # Wake word detected!
+                logger.info("✅ Wake word 'IRIS' detected!")
+                self.root.after(0, self._update_voice_status, "✅ IRIS detected! Say your command...", '#ffff00')
                 self.root.after(0, self.status_label.config, 
-                              {'text': "🎤 Wake word detected! Listening for command..."})
+                              {'text': "🎤 Wake word 'IRIS' detected! Listening for command..."})
                 
                 # Give user time to speak after wake word
                 time.sleep(0.3)
+                
+                # Update status - recording command
+                self.root.after(0, self._update_voice_status, "🎙️ Recording command...", '#ff9900')
+                logger.info("Recording command...")
                 
                 # Listen for command with shorter duration for responsiveness
                 audio_data = self.speech_recognizer.record_audio(
@@ -513,32 +552,41 @@ class MobileGUIDetector:
                 
                 if audio_data is None or len(audio_data) == 0:
                     logger.warning("No audio captured")
+                    self.root.after(0, self._update_voice_status, "⚠️ No audio detected", '#ff9900')
                     self.root.after(0, self.status_label.config,
-                                  {'text': "🎤 No audio detected, try again"})
+                                  {'text': "🎤 No audio detected, say 'IRIS' again"})
+                    time.sleep(1)
                     continue
                 
                 # Transcribe in background
                 logger.info("Transcribing command...")
+                self.root.after(0, self._update_voice_status, "⚙️ Processing speech...", '#0099ff')
                 self.root.after(0, self.status_label.config,
-                              {'text': "🎤 Processing command..."})
+                              {'text': "🎤 Processing your command..."})
                 
                 command_text = self.speech_recognizer.transcribe(audio_data)
                 
                 if command_text:
-                    logger.info(f"Command recognized: '{command_text}'")
+                    logger.info(f"✅ Command recognized: '{command_text}'")
+                    self.root.after(0, self._update_voice_status, 
+                                  f"✅ Heard: '{command_text}'", '#00ff00')
                     self.root.after(0, self._process_voice_command, command_text)
+                    time.sleep(2)  # Show result for 2 seconds
                 else:
                     logger.warning("No text transcribed")
+                    self.root.after(0, self._update_voice_status, "❌ Could not understand", '#ff0000')
                     self.root.after(0, self.status_label.config,
-                                  {'text': "🎤 Could not understand command"})
+                                  {'text': "🎤 Could not understand command, try again"})
+                    time.sleep(1)
                 
             except KeyboardInterrupt:
                 break
             except Exception as e:
                 logger.error(f"Voice loop error: {e}")
+                self.root.after(0, self._update_voice_status, f"❌ Error: {str(e)}", '#ff0000')
                 self.root.after(0, self.status_label.config,
                               {'text': f"🎤 Error: {str(e)}"})
-                time.sleep(0.5)
+                time.sleep(1)
     
     def _process_voice_command(self, command):
         """Process voice command"""
