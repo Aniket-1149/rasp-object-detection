@@ -475,7 +475,7 @@ class MobileGUIDetector:
                 foreground='#00ff00'
             )
             self.status_label.config(
-                text="🎤 Voice control active • Say 'IRIS' then 'DETECT' or 'STOP'"
+                text="🎤 Voice control active • Say 'IRIS' then 'START' or 'STOP'"
             )
             
             # Start voice thread
@@ -589,30 +589,55 @@ class MobileGUIDetector:
                 time.sleep(1)
     
     def _process_voice_command(self, command):
-        """Process voice command"""
+        """Process voice command - flexible matching for low-quality audio"""
         command_lower = command.lower().strip()
         
         logger.info(f"Processing command: '{command_lower}'")
         
-        # Check for start/detect commands
-        if any(word in command_lower for word in ['detect', 'start', 'begin', 'go']):
+        # Flexible matching for START commands
+        # Handles misrecognitions like "start", "starred", "status", etc.
+        start_keywords = [
+            'start', 'detect', 'begin', 'go', 'run',
+            'starred', 'starting', 'started',  # Common misrecognitions
+            'stat', 'star',  # Partial matches
+        ]
+        
+        # Flexible matching for STOP commands  
+        # Handles misrecognitions like "stop", "stopped", "top", etc.
+        stop_keywords = [
+            'stop', 'end', 'pause', 'halt', 'finish',
+            'stopped', 'stopping',  # Common misrecognitions
+            'top', 'hop',  # Partial matches
+        ]
+        
+        # Check for START command
+        if any(word in command_lower for word in start_keywords):
+            logger.info(f"✅ Matched START command from: '{command}'")
             self.status_label.config(text=f"✅ Starting detection: '{command}'")
             threading.Thread(target=self._speak_and_start, daemon=True).start()
             
-        # Check for stop commands
-        elif any(word in command_lower for word in ['stop', 'end', 'pause', 'halt']):
+        # Check for STOP command
+        elif any(word in command_lower for word in stop_keywords):
+            logger.info(f"✅ Matched STOP command from: '{command}'")
             self.status_label.config(text=f"✅ Stopping detection: '{command}'")
             threading.Thread(target=self._speak_and_stop, daemon=True).start()
             
-        # Check for announce/what do you see commands
-        elif any(phrase in command_lower for phrase in ['what', 'see', 'announce', 'tell me']):
+        # Check for ANNOUNCE/WHAT commands
+        elif any(phrase in command_lower for phrase in ['what', 'see', 'announce', 'tell', 'show']):
+            logger.info(f"✅ Matched ANNOUNCE command from: '{command}'")
             self.status_label.config(text=f"✅ Announcing: '{command}'")
             self.announce_objects()
             
+        # If nothing matches but command has any text, try to guess intent
+        elif len(command_lower) > 0:
+            logger.warning(f"⚠️ Unclear command: '{command}'")
+            self.status_label.config(text=f"❓ Unclear command: '{command}' - Say START or STOP")
+            self.tts.speak("Say START or STOP")
+            
         else:
-            logger.warning(f"Command not recognized: '{command}'")
-            self.status_label.config(text=f"❓ Command not recognized: '{command}'")
-            self.tts.speak("Command not recognized")
+            logger.warning(f"❌ Empty or unrecognized command")
+            self.status_label.config(text=f"❌ No command heard - Try again")
+            self.tts.speak("No command heard")
     
     def _speak_and_start(self):
         """Speak then start detection (non-blocking)"""
