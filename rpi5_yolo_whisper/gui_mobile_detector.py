@@ -409,8 +409,34 @@ class MobileGUIDetector:
         fov = self.fov_var.get()
         width, height = map(int, fov.split('x'))
         logger.info(f"FOV changed to {width}x{height}")
-        # Note: Changing resolution requires camera reinitialization
-        # For now, just log it. Can be implemented to restart camera.
+        
+        # Stop detection if running
+        was_detecting = self.detecting
+        if self.detecting:
+            self.stop_detection()
+            time.sleep(0.5)
+        
+        # Reinitialize camera with new resolution
+        try:
+            self.yolo.release()
+            self.yolo = YOLODetector(
+                model_path=self.config['yolo_model'],
+                confidence_threshold=self.config['yolo_confidence'],
+                camera_type=self.config['camera_type'],
+                camera_index=self.config['camera_index'],
+                width=width,
+                height=height
+            )
+            self.status_label.config(text=f"📐 FOV updated to {width}x{height}")
+            logger.info(f"Camera reinitialized with {width}x{height}")
+            
+            # Restart detection if it was running
+            if was_detecting:
+                time.sleep(0.5)
+                self.start_detection()
+        except Exception as e:
+            logger.error(f"Failed to update FOV: {e}")
+            self.status_label.config(text=f"❌ Failed to update FOV: {e}")
     
     def toggle_voice_control(self):
         """Toggle voice control on/off"""
@@ -424,21 +450,31 @@ class MobileGUIDetector:
         if self.voice_listening:
             return
         
-        self.voice_listening = True
-        self.voice_button.config(
-            text="🎤 Voice Control: ON",
-            bg='#107c10'
-        )
-        self.status_label.config(
-            text="🎤 Listening • Say 'IRIS DETECT' or 'IRIS STOP'"
-        )
-        
-        # Start voice thread
-        self.voice_thread = threading.Thread(target=self._voice_loop, daemon=True)
-        self.voice_thread.start()
-        
-        logger.info("Voice control started")
-        self.tts.speak("Voice control activated")
+        try:
+            self.voice_listening = True
+            self.voice_button.config(
+                text="🎤 Voice Control: ON",
+                bg='#107c10'
+            )
+            self.status_label.config(
+                text="🎤 Listening • Say 'IRIS' then 'DETECT' or 'STOP'"
+            )
+            
+            # Start voice thread
+            self.voice_thread = threading.Thread(target=self._voice_loop, daemon=True)
+            self.voice_thread.start()
+            
+            logger.info("✅ Voice control started successfully")
+            threading.Thread(target=self.tts.speak, args=("Voice control activated",), daemon=True).start()
+            
+        except Exception as e:
+            logger.error(f"Failed to start voice control: {e}")
+            self.voice_listening = False
+            self.voice_button.config(
+                text="🎤 Voice Control: OFF",
+                bg='#d13438'
+            )
+            self.status_label.config(text=f"❌ Voice control error: {e}")
     
     def stop_voice_control(self):
         """Stop listening for voice commands"""
@@ -463,45 +499,72 @@ class MobileGUIDetector:
                 
                 logger.info("Wake word detected!")
                 self.root.after(0, self.status_label.config, 
-                              {'text': "🎤 Wake word detected! Listening..."})
+                              {'text': "🎤 Wake word detected! Listening for command..."})
                 
-                # Listen for command
+                # Give user time to speak after wake word
+                time.sleep(0.3)
+                
+                # Listen for command with shorter duration for responsiveness
                 audio_data = self.speech_recognizer.record_audio(
-                    duration=5,
-                    silence_threshold=0.01,
-                    max_silence_duration=2.0
+                    duration=3,  # Reduced from 5 to 3 seconds for faster response
+                    silence_threshold=0.02,  # Slightly higher threshold
+                    max_silence_duration=1.5  # Stop faster when user stops talking
                 )
                 
-                # Transcribe
+                if audio_data is None or len(audio_data) == 0:
+                    logger.warning("No audio captured")
+                    self.root.after(0, self.status_label.config,
+                                  {'text': "🎤 No audio detected, try again"})
+                    continue
+                
+                # Transcribe in background
+                logger.info("Transcribing command...")
+                self.root.after(0, self.status_label.config,
+                              {'text': "🎤 Processing command..."})
+                
                 command_text = self.speech_recognizer.transcribe(audio_data)
                 
                 if command_text:
-                    logger.info(f"Command: {command_text}")
+                    logger.info(f"Command recognized: '{command_text}'")
                     self.root.after(0, self._process_voice_command, command_text)
+                else:
+                    logger.warning("No text transcribed")
+                    self.root.after(0, self.status_label.config,
+                                  {'text': "🎤 Could not understand command"})
                 
+            except KeyboardInterrupt:
+                break
             except Exception as e:
                 logger.error(f"Voice loop error: {e}")
-                time.sleep(0.1)
+                self.root.after(0, self.status_label.config,
+                              {'text': f"🎤 Error: {str(e)}"})
+                time.sleep(0.5)
     
     def _process_voice_command(self, command):
         """Process voice command"""
-        command_lower = command.lower()
+        command_lower = command.lower().strip()
         
-        if 'detect' in command_lower or 'start' in command_lower:
-            self.status_label.config(text=f"🎤 Command: '{command}' → Starting detection")
-            # Fix: Use threading to avoid blocking GUI
+        logger.info(f"Processing command: '{command_lower}'")
+        
+        # Check for start/detect commands
+        if any(word in command_lower for word in ['detect', 'start', 'begin', 'go']):
+            self.status_label.config(text=f"✅ Starting detection: '{command}'")
             threading.Thread(target=self._speak_and_start, daemon=True).start()
             
-        elif 'stop' in command_lower:
-            self.status_label.config(text=f"🎤 Command: '{command}' → Stopping detection")
-            # Fix: Use threading to avoid blocking GUI
+        # Check for stop commands
+        elif any(word in command_lower for word in ['stop', 'end', 'pause', 'halt']):
+            self.status_label.config(text=f"✅ Stopping detection: '{command}'")
             threading.Thread(target=self._speak_and_stop, daemon=True).start()
             
-        elif 'what' in command_lower and 'see' in command_lower:
-            self.status_label.config(text=f"🎤 Command: '{command}' → Announcing")
+        # Check for announce/what do you see commands
+        elif any(phrase in command_lower for phrase in ['what', 'see', 'announce', 'tell me']):
+            self.status_label.config(text=f"✅ Announcing: '{command}'")
             self.announce_objects()
+            
         else:
-            self.status_label.config(text=f"🎤 Command not recognized: '{command}'")
+            logger.warning(f"Command not recognized: '{command}'")
+            self.status_label.config(text=f"❓ Command not recognized: '{command}'")
+            self.tts.speak("Command not recognized")
     
     def _speak_and_start(self):
         """Speak then start detection (non-blocking)"""
