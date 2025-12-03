@@ -33,16 +33,19 @@ echo "=========================================="
 echo "🎥 Pi Camera Detection:"
 echo "=========================================="
 if command -v vcgencmd &> /dev/null; then
-    vcgencmd get_camera
+    camera_output=$(vcgencmd get_camera 2>&1)
+    echo "$camera_output"
     echo ""
     
-    # Check if camera is enabled
-    if vcgencmd get_camera | grep -q "detected=1"; then
+    # Check if command works (Pi 5 doesn't support this command)
+    if echo "$camera_output" | grep -q "not registered"; then
+        echo "ℹ️  vcgencmd get_camera not supported on Raspberry Pi 5"
+        echo "   This is normal - camera detection uses rpicam instead"
+    elif echo "$camera_output" | grep -q "detected=1"; then
         echo "✅ Pi Camera is detected!"
     else
-        echo "❌ Pi Camera NOT detected!"
-        echo "   → Check ribbon cable connection"
-        echo "   → Enable camera: sudo raspi-config → Interface Options → Camera"
+        echo "⚠️  Camera status unknown from vcgencmd"
+        echo "   → Will check with rpicam commands below"
     fi
 else
     echo "⚠️  vcgencmd not available (not on Raspberry Pi)"
@@ -161,8 +164,19 @@ if [ -f .env ]; then
     
     if [ "$camera_type" = "picamera" ]; then
         echo "✓ .env is set to use Pi Camera"
-        if vcgencmd get_camera 2>/dev/null | grep -q "detected=1"; then
-            echo "✓ Pi Camera is detected"
+        
+        # Check if rpicam test was successful
+        if command -v rpicam-hello &> /dev/null; then
+            if timeout 3 rpicam-hello --timeout 2000 &> /dev/null; then
+                echo "✓ Pi Camera is working (rpicam test successful)"
+            else
+                echo "⚠️  rpicam test had issues"
+            fi
+        fi
+        
+        # Check if picamera2 is installed
+        if python -c "import picamera2" 2>/dev/null; then
+            echo "✓ picamera2 is installed"
             echo ""
             echo "✅ Everything looks good for Pi Camera!"
             echo ""
@@ -170,13 +184,14 @@ if [ -f .env ]; then
             echo "  source venv/bin/activate"
             echo "  python gui_detector.py"
         else
-            echo "❌ Pi Camera not detected!"
+            echo "❌ picamera2 NOT installed (REQUIRED!)"
             echo ""
-            echo "Fix steps:"
-            echo "  1. Check ribbon cable (blue side to camera, pins to black latch)"
-            echo "  2. Enable camera: sudo raspi-config"
-            echo "  3. Reboot: sudo reboot"
-            echo "  4. Test: libcamera-hello --timeout 2000"
+            echo "Quick Fix:"
+            echo "  sudo apt-get install python3-picamera2"
+            echo ""
+            echo "Then run the detector:"
+            echo "  source venv/bin/activate"
+            echo "  python gui_detector.py"
         fi
     elif [ "$camera_type" = "usb" ]; then
         echo "✓ .env is set to use USB Camera"
