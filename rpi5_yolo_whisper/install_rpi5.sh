@@ -53,10 +53,11 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "Note: Enable camera interface in raspi-config if not already enabled"
 fi
 
-# Create virtual environment
+# Create virtual environment with system site packages (for picamera2)
 echo ""
 echo "🔧 Creating Python virtual environment..."
-python3 -m venv venv
+echo "   (with access to system packages for picamera2)"
+python3 -m venv venv --system-site-packages
 
 # Activate virtual environment
 echo "🔧 Activating virtual environment..."

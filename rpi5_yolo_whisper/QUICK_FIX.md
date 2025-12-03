@@ -20,15 +20,23 @@ cd ~/rasp-object-detection
 git pull origin main
 cd rpi5_yolo_whisper
 
-# 2. Install picamera2
+# 2. Install picamera2 system-wide
 sudo apt-get update
 sudo apt-get install python3-picamera2
 
-# 3. Verify installation
-python3 -c 'import picamera2; print("picamera2 installed successfully")'
+# 3. Recreate virtual environment with system packages access
+deactivate  # If already activated
+rm -rf venv
+python3 -m venv venv --system-site-packages
 
-# 4. Run the detector
+# 4. Activate and install requirements
 source venv/bin/activate
+pip install -r requirements_rpi5.txt
+
+# 5. Verify picamera2 works in venv
+python -c 'import picamera2; print("picamera2 accessible in venv")'
+
+# 6. Run the detector
 python gui_detector.py
 ```
 
