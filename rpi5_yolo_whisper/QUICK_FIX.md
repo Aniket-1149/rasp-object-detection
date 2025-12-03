@@ -10,17 +10,24 @@ The diagnostics showed:
 Camera detected: imx219@10
 ```
 
-## ⚡ One Command to Fix Everything
+## ⚡ Quick Fix Commands
 
-You just need to install `picamera2`:
+Run these commands on your Raspberry Pi:
 
 ```bash
+# 1. Get latest code updates
+cd ~/rasp-object-detection
+git pull origin main
+cd rpi5_yolo_whisper
+
+# 2. Install picamera2
+sudo apt-get update
 sudo apt-get install python3-picamera2
-```
 
-That's it! Then run:
+# 3. Verify installation
+python3 -c "import picamera2; print('✅ picamera2 installed!')"
 
-```bash
+# 4. Run the detector
 source venv/bin/activate
 python gui_detector.py
 ```

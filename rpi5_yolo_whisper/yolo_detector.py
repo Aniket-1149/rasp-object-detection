@@ -79,12 +79,14 @@ class YOLODetector:
                 try:
                     from picamera2 import Picamera2
                     self.cap = Picamera2()
+                    # Use XRGB8888 format for better compatibility
                     config = self.cap.create_video_configuration(
-                        main={"format": 'RGB888', "size": (self.width, self.height)}
+                        main={"format": 'XRGB8888', "size": (self.width, self.height)}
                     )
                     self.cap.configure(config)
                     self.cap.start()
                     logger.info(f"✅ Pi Camera initialized ({self.width}x{self.height})")
+                    logger.info(f"Camera format: XRGB8888")
                 except ImportError as e:
                     logger.error("❌ picamera2 library not installed!")
                     logger.error("Install it with: sudo apt-get install python3-picamera2")
@@ -132,8 +134,10 @@ class YOLODetector:
         
         try:
             if self.camera_type == 'picamera':
-                frame_rgb = self.cap.capture_array()
-                frame = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+                # Capture array in XRGB8888 format (BGRA)
+                frame_bgra = self.cap.capture_array()
+                # Convert BGRA to BGR (remove alpha channel)
+                frame = cv2.cvtColor(np.copy(frame_bgra), cv2.COLOR_BGRA2BGR)
             elif self.camera_type == 'usb':
                 ret, frame = self.cap.read()
                 if not ret:
