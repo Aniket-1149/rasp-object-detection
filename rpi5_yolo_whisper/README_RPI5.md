@@ -107,9 +107,9 @@ WHISPER_DEVICE=cpu
 YOLO_MODEL=models/yolo11n.pt
 YOLO_CONFIDENCE=0.5
 
-# Camera Settings
-CAMERA_TYPE=picamera  # or 'usb'
-CAMERA_INDEX=0
+# Camera Settings (Default: Pi Camera)
+CAMERA_TYPE=picamera  # 'picamera' for Pi Camera, 'usb' for USB webcam
+CAMERA_INDEX=0        # For USB cameras only
 CAMERA_WIDTH=640
 CAMERA_HEIGHT=480
 

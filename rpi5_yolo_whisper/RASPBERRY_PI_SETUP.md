@@ -41,33 +41,38 @@ chmod +x install_rpi5.sh
 
 **⏱️ Time required:** 15-20 minutes
 
-**💡 Tip:** The script will ask if you have a Pi Camera. Answer 'y' if you do.
+**💡 Tip:** The script will ask if you have a Pi Camera. Answer **'y'** since you're using Pi Camera Module.
 
-### Step 3: Configure Camera (if needed)
+### Step 3: Enable Pi Camera
 
-**For Raspberry Pi Camera Module:**
+**The project is configured for Raspberry Pi Camera by default.**
 
-1. Edit `.env` file:
-   ```bash
-   nano .env
-   ```
+Enable camera interface:
+```bash
+sudo raspi-config
+```
+Navigate to: `Interface Options` → `Camera` → `Enable` → Reboot
 
-2. Change camera type:
-   ```env
-   CAMERA_TYPE=picamera
-   ```
+**Verify camera is working:**
+```bash
+# Test Pi Camera
+libcamera-hello --timeout 2000
 
-3. Enable camera in raspi-config:
-   ```bash
-   sudo raspi-config
-   ```
-   Navigate to: `Interface Options` → `Camera` → `Enable`
+# Or take a test photo
+libcamera-still -o test.jpg
+```
 
-**For USB Webcam:**
+**If using USB Webcam instead:**
 
-The default settings should work. If you have multiple cameras:
+Edit `.env` file:
+```bash
+nano .env
+```
+
+Change camera type:
 ```env
-CAMERA_INDEX=0  # Try 0, 1, 2, etc.
+CAMERA_TYPE=usb  # Change from 'picamera' to 'usb'
+CAMERA_INDEX=0   # Try 0, 1, 2 if you have multiple cameras
 ```
 
 ### Step 4: Test Installation
@@ -169,8 +174,8 @@ nano .env
 YOLO_CONFIDENCE=0.5        # 0.1 (sensitive) to 0.9 (strict)
 
 # Camera Settings
-CAMERA_TYPE=usb            # 'usb' or 'picamera'
-CAMERA_INDEX=0             # Camera device number
+CAMERA_TYPE=picamera       # 'picamera' for Pi Camera, 'usb' for USB webcam
+CAMERA_INDEX=0             # Camera device number (for USB only)
 CAMERA_WIDTH=640           # Resolution width
 CAMERA_HEIGHT=480          # Resolution height
 
@@ -209,21 +214,39 @@ sudo apt-get install python3-tk
 
 ### Problem: Camera not detected
 
-**Check camera:**
+**Check Pi Camera:**
 ```bash
-# For USB camera
+# Check if camera is detected
+vcgencmd get_camera
+# Should show: supported=1 detected=1
+
+# Test camera
+libcamera-hello --timeout 2000
+
+# Check camera interface is enabled
+sudo raspi-config
+# Go to: Interface Options → Camera → Enable
+```
+
+**If camera still not working:**
+```bash
+# Check ribbon cable connection (make sure it's secure)
+# Reboot after enabling camera
+sudo reboot
+
+# Check for picamera2 installation
+pip list | grep picamera2
+```
+
+**For USB camera users:**
+```bash
+# Check USB camera
 ls /dev/video*
 # Should show: /dev/video0
 
-# For Pi Camera
-vcgencmd get_camera
-# Should show: supported=1 detected=1
-```
-
-**Try different camera type:**
-```bash
+# Change to USB in .env
 nano .env
-# Change: CAMERA_TYPE=usb (or picamera)
+# Set: CAMERA_TYPE=usb
 ```
 
 ### Problem: No voice output
@@ -261,7 +284,7 @@ pip install pyttsx3 --force-reinstall
 
 3. **Close other applications**
 
-4. **Use USB camera** (typically faster than Pi Camera)
+4. **Optimize Pi Camera settings** (adjust resolution and frame rate)
 
 ### Problem: Import errors
 
@@ -362,7 +385,7 @@ git pull origin main
 ✅ **Clean background** - Less clutter = better detection
 ✅ **Stable camera** - Mount or place on steady surface
 ✅ **Close other apps** - Free up Pi's resources
-✅ **Use USB camera** - Generally faster on Pi 5
+✅ **Pi Camera V2/V3** - Works great with Raspberry Pi 5
 
 ### Expected Performance:
 
