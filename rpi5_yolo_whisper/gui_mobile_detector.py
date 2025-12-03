@@ -536,8 +536,11 @@ class MobileGUIDetector:
                 self.root.after(0, self.status_label.config, 
                               {'text': "🎤 Wake word 'IRIS' detected! Listening for command..."})
                 
+                # Speak feedback to user
+                threading.Thread(target=self.tts.speak, args=("Listening for command",), daemon=True).start()
+                
                 # Give user time to speak after wake word
-                time.sleep(0.3)
+                time.sleep(0.5)  # Slightly longer for TTS to start
                 
                 # Update status - recording command
                 self.root.after(0, self._update_voice_status, "🎙️ Recording command...", '#ff9900')
