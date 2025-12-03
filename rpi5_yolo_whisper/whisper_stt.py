@@ -166,7 +166,10 @@ class WhisperRecognizer:
                     language=self.language,
                     beam_size=5,
                     vad_filter=True,  # Voice Activity Detection to filter out silence
-                    vad_parameters=dict(min_silence_duration_ms=500)
+                    vad_parameters=dict(
+                        min_silence_duration_ms=500,
+                        threshold=0.2  # Lower threshold = less aggressive filtering (default 0.5)
+                    )
                 )
                 
                 # Combine segments
