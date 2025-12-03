@@ -163,9 +163,24 @@ class MobileGUIDetector:
                                         padding="5", style='Medium.TFrame')
         video_container.pack(fill=tk.BOTH, expand=True, pady=5)
         
-        self.video_label = ttk.Label(video_container, text="Camera initializing...",
+        # Create canvas with scrollbar for scrollable video
+        canvas_frame = ttk.Frame(video_container, style='Medium.TFrame')
+        canvas_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self.video_canvas = tk.Canvas(canvas_frame, bg='black', highlightthickness=0)
+        scrollbar_y = ttk.Scrollbar(canvas_frame, orient=tk.VERTICAL, command=self.video_canvas.yview)
+        scrollbar_x = ttk.Scrollbar(video_container, orient=tk.HORIZONTAL, command=self.video_canvas.xview)
+        
+        self.video_canvas.configure(yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
+        
+        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+        scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
+        self.video_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Video label inside canvas
+        self.video_label = ttk.Label(self.video_canvas, text="Camera initializing...",
                                      background='black', foreground='white')
-        self.video_label.pack(fill=tk.BOTH, expand=True)
+        self.video_window = self.video_canvas.create_window((0, 0), window=self.video_label, anchor=tk.NW)
         
         # ===== CONTROLS PANEL =====
         controls_frame = ttk.LabelFrame(main_frame, text="⚙️ Controls", 
@@ -474,19 +489,29 @@ class MobileGUIDetector:
         
         if 'detect' in command_lower or 'start' in command_lower:
             self.status_label.config(text=f"🎤 Command: '{command}' → Starting detection")
-            self.tts.speak("Starting detection")
-            self.start_detection()
+            # Fix: Use threading to avoid blocking GUI
+            threading.Thread(target=self._speak_and_start, daemon=True).start()
             
         elif 'stop' in command_lower:
             self.status_label.config(text=f"🎤 Command: '{command}' → Stopping detection")
-            self.tts.speak("Stopping detection")
-            self.stop_detection()
+            # Fix: Use threading to avoid blocking GUI
+            threading.Thread(target=self._speak_and_stop, daemon=True).start()
             
         elif 'what' in command_lower and 'see' in command_lower:
             self.status_label.config(text=f"🎤 Command: '{command}' → Announcing")
             self.announce_objects()
         else:
             self.status_label.config(text=f"🎤 Command not recognized: '{command}'")
+    
+    def _speak_and_start(self):
+        """Speak then start detection (non-blocking)"""
+        self.tts.speak("Starting detection")
+        self.root.after(0, self.start_detection)
+    
+    def _speak_and_stop(self):
+        """Speak then stop detection (non-blocking)"""
+        self.tts.speak("Stopping detection")
+        self.root.after(0, self.stop_detection)
     
     def toggle_detection(self):
         """Toggle detection on/off (manual)"""
@@ -610,15 +635,14 @@ class MobileGUIDetector:
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = Image.fromarray(frame_rgb)
         
-        # Resize to fit display
-        display_width = 900
-        aspect_ratio = img.height / img.width
-        display_height = int(display_width * aspect_ratio)
-        img = img.resize((display_width, display_height), Image.Resampling.LANCZOS)
-        
+        # Don't resize - keep original size for scrolling
+        # User can scroll if image is larger than display
         photo = ImageTk.PhotoImage(image=img)
         self.video_label.config(image=photo)
         self.video_label.image = photo
+        
+        # Update canvas scroll region to match image size
+        self.video_canvas.config(scrollregion=self.video_canvas.bbox(tk.ALL))
         
         # Update detection info
         if results and results['count'] > 0:
@@ -652,7 +676,8 @@ class MobileGUIDetector:
                 results = self.yolo.detect_objects(frame=frame, capture_new=False)
         
         if results and results['count'] > 0:
-            announcement = f"I see {results['summary']}"
+            # Fix: Remove "I see" duplication - just announce the summary
+            announcement = results['summary']
             logger.info(f"Announcing: {announcement}")
             threading.Thread(target=self.tts.speak, args=(announcement,), daemon=True).start()
             self.status_label.config(text=f"🔊 Announced: {results['summary']}")
