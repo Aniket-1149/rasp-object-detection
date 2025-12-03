@@ -165,7 +165,10 @@ class WhisperRecognizer:
                     tmp_path,
                     language=self.language,
                     beam_size=5,
+                    best_of=5,
+                    temperature=0,
                     vad_filter=False,  # Disable VAD for low-volume microphones
+                    condition_on_previous_text=False,
                     # Note: If you have good mic volume and want to filter silence, 
                     # change vad_filter=True and uncomment below:
                     # vad_parameters=dict(
@@ -174,8 +177,15 @@ class WhisperRecognizer:
                     # )
                 )
                 
-                # Combine segments
-                text = " ".join([segment.text for segment in segments])
+                # Convert generator to list and combine segments
+                segment_list = list(segments)
+                logger.info(f"Number of segments: {len(segment_list)}")
+                
+                # Log each segment for debugging
+                for i, segment in enumerate(segment_list):
+                    logger.info(f"Segment {i}: '{segment.text.strip()}'")
+                
+                text = " ".join([segment.text.strip() for segment in segment_list])
                 
                 logger.info(f"Detected language: {info.language} (probability: {info.language_probability:.2f})")
             else:
@@ -195,6 +205,15 @@ class WhisperRecognizer:
             # Clean and return text
             text = text.strip()
             logger.info(f"Transcribed text: '{text}'")
+            
+            # If text is empty, log warning
+            if not text:
+                logger.warning("⚠️ Whisper returned empty transcription!")
+                logger.warning("This could mean:")
+                logger.warning("  1. Audio volume too low")
+                logger.warning("  2. No speech detected")
+                logger.warning("  3. Background noise only")
+                logger.warning("Try speaking LOUDER and closer to microphone")
             
             return text
             
