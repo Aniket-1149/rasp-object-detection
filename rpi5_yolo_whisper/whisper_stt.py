@@ -178,6 +178,7 @@ class WhisperRecognizer:
                     beam_size=5,
                     best_of=5,
                     temperature=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],  # Try multiple temperatures for low-quality audio
+                    initial_prompt="Voice commands: start, stop, begin, end, detect, detection.",  # Hint expected words
                     vad_filter=False,  # Disable VAD for low-volume microphones
                     condition_on_previous_text=False,
                     no_speech_threshold=0.3,  # Lower threshold to detect more speech (default 0.6)

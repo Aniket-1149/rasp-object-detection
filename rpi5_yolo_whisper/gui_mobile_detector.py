@@ -620,6 +620,7 @@ class MobileGUIDetector:
             'start', 'detect', 'begin', 'go', 'run',
             'starred', 'starting', 'started',  # Common misrecognitions
             'stat', 'star',  # Partial matches
+            'thank you', 'thanks',  # Very common Whisper hallucination for "START"
         ]
         
         # Flexible matching for STOP commands  
@@ -711,11 +712,11 @@ class MobileGUIDetector:
         logger.info("Detection stopped")
     
     def _detection_loop(self):
-        """Main detection loop"""
+        """Main detection loop - keeps camera feed running even when detection paused"""
         fps_time = time.time()
         fps_counter = 0
         
-        while self.detecting:
+        while self.detecting or self.running:  # Keep running even if detection paused
             try:
                 # Capture frame
                 frame = self.yolo.capture_frame()
@@ -723,26 +724,31 @@ class MobileGUIDetector:
                     time.sleep(0.1)
                     continue
                 
-                # Detect objects
-                results = self.yolo.detect_objects(frame=frame, capture_new=False)
-                
-                if results:
-                    # Draw detections
-                    annotated_frame = self._draw_detections(frame, results['detections'])
+                # Only detect if actively detecting (not paused for voice command)
+                if self.detecting:
+                    # Detect objects
+                    results = self.yolo.detect_objects(frame=frame, capture_new=False)
                     
-                    # Update GUI
-                    self.root.after(0, self._update_display, annotated_frame, results)
-                    
-                    # Update stats
-                    self.total_detections += results['count']
-                    self.root.after(0, self.total_label.config, {'text': str(self.total_detections)})
-                    
-                    # Check for new objects and announce
-                    if self.auto_announce_var.get():
-                        self._check_and_announce(results)
-                    
-                    fps_counter += 1
+                    if results:
+                        # Draw detections
+                        annotated_frame = self._draw_detections(frame, results['detections'])
+                        
+                        # Update GUI
+                        self.root.after(0, self._update_display, annotated_frame, results)
+                        
+                        # Update stats
+                        self.total_detections += results['count']
+                        self.root.after(0, self.total_label.config, {'text': str(self.total_detections)})
+                        
+                        # Check for new objects and announce
+                        if self.auto_announce_var.get():
+                            self._check_and_announce(results)
+                        
+                        fps_counter += 1
+                    else:
+                        self.root.after(0, self._update_display, frame, None)
                 else:
+                    # Detection paused - just show camera feed without detection
                     self.root.after(0, self._update_display, frame, None)
                 
                 # Calculate FPS
