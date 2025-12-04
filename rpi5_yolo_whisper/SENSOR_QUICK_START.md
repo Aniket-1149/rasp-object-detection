@@ -47,9 +47,33 @@ sudo raspi-config
 ### Step 3: Start pigpio Daemon
 
 ```bash
+# Start pigpio daemon (runs in background)
+sudo pigpiod
+
+# Verify it's running
+pgrep pigpiod  # Should show a process ID number
+```
+
+**Note:** If you want pigpiod to auto-start on boot, create a systemd service:
+```bash
+sudo tee /etc/systemd/system/pigpiod.service > /dev/null << 'EOF'
+[Unit]
+Description=Pigpio daemon
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/local/bin/pigpiod
+ExecStop=/bin/systemctl kill pigpiod
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
 sudo systemctl enable pigpiod
 sudo systemctl start pigpiod
-sudo systemctl status pigpiod  # Should show "active (running)"
 ```
 
 ### Step 4: Wire Hardware
@@ -201,8 +225,11 @@ Before using with blind users:
 
 ### "pigpio daemon not running"
 ```bash
-sudo systemctl start pigpiod
-sudo systemctl enable pigpiod
+# Start daemon manually
+sudo pigpiod
+
+# Verify it's running
+pgrep pigpiod
 ```
 
 ### "I2C device not found"

@@ -37,9 +37,8 @@ rm -rf pigpio-master master.zip
 # Install Python packages in venv
 pip install smbus2 pigpio
 
-# Enable and start pigpio daemon
-sudo systemctl enable pigpiod
-sudo systemctl start pigpiod
+# Start pigpio daemon
+sudo pigpiod
 ```
 
 ### 2. Verify Installation

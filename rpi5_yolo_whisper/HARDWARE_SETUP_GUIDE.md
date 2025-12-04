@@ -164,13 +164,15 @@ cd ..
 rm -rf pigpio-master master.zip
 ```
 
-### 3. Enable pigpio Daemon (for ultrasonic timing)
+### 3. Start pigpio Daemon (for ultrasonic timing)
 
 ```bash
-sudo systemctl enable pigpiod
-sudo systemctl start pigpiod
-sudo systemctl status pigpiod
-# Should show: active (running)
+# Start pigpio daemon
+sudo pigpiod
+
+# Verify it's running
+pgrep pigpiod
+# Should show a process ID number
 ```
 
 ### 4. Verify I2C Connection
